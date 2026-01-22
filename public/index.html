@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Your Video - Text to Speech</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎙️ Voice Your Video</h1>
+      <p class="subtitle">Transform text into speech with Azure AI</p>
+    </header>
+
+    <main>
+      <form id="synthesizeForm">
+        <div class="form-group">
+          <label for="voiceSelect">Select Voice</label>
+          <select id="voiceSelect" required>
+            <option value="">Loading voices...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="textInput">Enter Text</label>
+          <textarea 
+            id="textInput" 
+            placeholder="Enter the text you want to convert to speech..."
+            rows="10"
+            required
+          ></textarea>
+          <div class="char-count">
+            <span id="charCount">0</span> characters
+          </div>
+        </div>
+
+        <button type="submit" id="synthesizeBtn" class="btn-primary">
+          <span class="btn-text">Generate Audio</span>
+          <span class="btn-loading" hidden>
+            <span class="spinner"></span>
+            Processing...
+          </span>
+        </button>
+      </form>
+
+      <div id="resultSection" class="result-section" hidden>
+        <h2>Generated Files</h2>
+        
+        <div class="result-card">
+          <div class="result-info">
+            <h3>🔊 Audio File</h3>
+            <p id="audioInfo">-</p>
+          </div>
+          <audio id="audioPlayer" controls></audio>
+          <a id="audioDownload" class="btn-download" download>
+            Download Audio
+          </a>
+        </div>
+
+        <div class="result-card">
+          <div class="result-info">
+            <h3>📝 Subtitle File (SRT)</h3>
+            <p id="srtInfo">-</p>
+          </div>
+          <div class="srt-preview" id="srtPreview"></div>
+          <a id="srtDownload" class="btn-download" download>
+            Download SRT
+          </a>
+        </div>
+
+        <div class="stats">
+          <div class="stat-item">
+            <span class="stat-label">Duration</span>
+            <span id="durationStat" class="stat-value">-</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Sentences</span>
+            <span id="sentencesStat" class="stat-value">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="errorSection" class="error-section" hidden>
+        <h3>⚠️ Error</h3>
+        <p id="errorMessage"></p>
+      </div>
+    </main>
+
+    <footer>
+      <p>Powered by Azure Cognitive Services Speech SDK</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
