@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { synthesizeSpeechWithTimings, SentenceTiming } from './speechService';
+import { translateSentencesToChinese, generateChineseSRT, generateBilingualSRT } from './translationService';
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ app.use('/output', express.static(outputDir));
 // API endpoint to synthesize speech
 app.post('/api/synthesize', async (req: Request, res: Response) => {
   try {
-    const { text, voiceName = 'fr-FR-EloiseNeural', outputFormat = 'wav' } = req.body;
+    const { text, voiceName = 'fr-FR-EloiseNeural', outputFormat = 'wav', translateToChinese = false } = req.body;
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       res.status(400).json({ error: 'Text is required and must be a non-empty string' });
@@ -43,7 +44,7 @@ app.post('/api/synthesize', async (req: Request, res: Response) => {
       return;
     }
 
-    console.log(`Processing text (${text.length} characters) with voice: ${voiceName}`);
+    console.log(`Processing text (${text.length} characters) with voice: ${voiceName}, translate: ${translateToChinese}`);
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -51,8 +52,12 @@ app.post('/api/synthesize', async (req: Request, res: Response) => {
     const baseFilename = `speech_${timestamp}_${safeVoiceName}`;
     const audioFilename = `${baseFilename}.${outputFormat}`;
     const srtFilename = `${baseFilename}.srt`;
+    const chineseSrtFilename = `${baseFilename}_chinese.srt`;
+    const bilingualSrtFilename = `${baseFilename}_bilingual.srt`;
     const audioFilePath = path.join(outputDir, audioFilename);
     const srtFilePath = path.join(outputDir, srtFilename);
+    const chineseSrtFilePath = path.join(outputDir, chineseSrtFilename);
+    const bilingualSrtFilePath = path.join(outputDir, bilingualSrtFilename);
 
     // Synthesize speech with sentence timings (sentence by sentence, then combine)
     const result = await synthesizeSpeechWithTimings({
@@ -72,21 +77,67 @@ app.post('/api/synthesize', async (req: Request, res: Response) => {
     const srtContent = generateSRTFromSentences(result.sentenceTimings || []);
     fs.writeFileSync(srtFilePath, srtContent, 'utf8');
 
-    // Get file sizes
-    const audioStats = fs.statSync(audioFilePath);
-    const srtStats = fs.statSync(srtFilePath);
-
-    res.json({
+    // Response object
+    const response: any = {
       success: true,
       audioUrl: `/output/${audioFilename}`,
       srtUrl: `/output/${srtFilename}`,
       audioFilename,
       srtFilename,
-      audioSize: audioStats.size,
-      srtSize: srtStats.size,
+      audioSize: fs.statSync(audioFilePath).size,
+      srtSize: fs.statSync(srtFilePath).size,
       duration: result.duration,
       sentenceCount: result.sentenceTimings?.length || 0,
-    });
+    };
+
+    // If translation is requested, translate to Chinese
+    if (translateToChinese && result.sentenceTimings && result.sentenceTimings.length > 0) {
+      const openaiEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+      const openaiApiKey = process.env.AZURE_OPENAI_API_KEY;
+      const openaiDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+
+      if (!openaiEndpoint || !openaiApiKey || !openaiDeployment) {
+        res.status(500).json({ 
+          error: 'Azure OpenAI not configured for translation. Please set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT_NAME environment variables.' 
+        });
+        return;
+      }
+
+      // Extract sentences for translation
+      const sentences = result.sentenceTimings.map(t => t.sentence);
+      
+      // Translate sentences to Chinese
+      const translationResult = await translateSentencesToChinese(
+        sentences,
+        openaiEndpoint,
+        openaiApiKey,
+        openaiDeployment
+      );
+
+      if (!translationResult.success || !translationResult.translations) {
+        res.status(500).json({ error: translationResult.error || 'Translation failed' });
+        return;
+      }
+
+      // Generate Chinese-only SRT
+      const chineseSrtContent = generateChineseSRT(result.sentenceTimings, translationResult.translations);
+      fs.writeFileSync(chineseSrtFilePath, chineseSrtContent, 'utf8');
+
+      // Generate bilingual SRT (original + Chinese)
+      const bilingualSrtContent = generateBilingualSRT(result.sentenceTimings, translationResult.translations);
+      fs.writeFileSync(bilingualSrtFilePath, bilingualSrtContent, 'utf8');
+
+      // Add translation info to response
+      response.chineseSrtUrl = `/output/${chineseSrtFilename}`;
+      response.chineseSrtFilename = chineseSrtFilename;
+      response.chineseSrtSize = fs.statSync(chineseSrtFilePath).size;
+      response.bilingualSrtUrl = `/output/${bilingualSrtFilename}`;
+      response.bilingualSrtFilename = bilingualSrtFilename;
+      response.bilingualSrtSize = fs.statSync(bilingualSrtFilePath).size;
+      response.translations = translationResult.translations;
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Synthesis error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'An unexpected error occurred' });
@@ -95,7 +146,7 @@ app.post('/api/synthesize', async (req: Request, res: Response) => {
 
 // API endpoint to get available voices
 app.get('/api/voices', async (req: Request, res: Response) => {
-  // Return a list of commonly used Azure Neural voices
+  // Return French and English Azure Neural voices
   const voices = [
     { name: 'fr-FR-VivienneMultilingualNeural', language: 'French (France)', gender: 'Female' },
     { name: 'fr-FR-EloiseNeural', language: 'French (France)', gender: 'Female' },
@@ -107,16 +158,6 @@ app.get('/api/voices', async (req: Request, res: Response) => {
     { name: 'en-US-AriaNeural', language: 'English (US)', gender: 'Female' },
     { name: 'en-GB-SoniaNeural', language: 'English (UK)', gender: 'Female' },
     { name: 'en-GB-RyanNeural', language: 'English (UK)', gender: 'Male' },
-    { name: 'de-DE-KatjaNeural', language: 'German', gender: 'Female' },
-    { name: 'de-DE-ConradNeural', language: 'German', gender: 'Male' },
-    { name: 'es-ES-ElviraNeural', language: 'Spanish (Spain)', gender: 'Female' },
-    { name: 'es-MX-DaliaNeural', language: 'Spanish (Mexico)', gender: 'Female' },
-    { name: 'it-IT-ElsaNeural', language: 'Italian', gender: 'Female' },
-    { name: 'ja-JP-NanamiNeural', language: 'Japanese', gender: 'Female' },
-    { name: 'ko-KR-SunHiNeural', language: 'Korean', gender: 'Female' },
-    { name: 'zh-CN-XiaoxiaoNeural', language: 'Chinese (Mandarin)', gender: 'Female' },
-    { name: 'zh-CN-YunxiNeural', language: 'Chinese (Mandarin)', gender: 'Male' },
-    { name: 'pt-BR-FranciscaNeural', language: 'Portuguese (Brazil)', gender: 'Female' },
   ];
 
   res.json({ voices });

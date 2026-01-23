@@ -7,6 +7,7 @@ const synthesizeBtn = document.getElementById('synthesizeBtn');
 const resultSection = document.getElementById('resultSection');
 const errorSection = document.getElementById('errorSection');
 const errorMessage = document.getElementById('errorMessage');
+const translateCheckbox = document.getElementById('translateCheckbox');
 
 // Audio elements
 const audioPlayer = document.getElementById('audioPlayer');
@@ -17,6 +18,18 @@ const audioInfo = document.getElementById('audioInfo');
 const srtPreview = document.getElementById('srtPreview');
 const srtDownload = document.getElementById('srtDownload');
 const srtInfo = document.getElementById('srtInfo');
+
+// Chinese SRT elements
+const chineseSrtCard = document.getElementById('chineseSrtCard');
+const chineseSrtPreview = document.getElementById('chineseSrtPreview');
+const chineseSrtDownload = document.getElementById('chineseSrtDownload');
+const chineseSrtInfo = document.getElementById('chineseSrtInfo');
+
+// Bilingual SRT elements
+const bilingualSrtCard = document.getElementById('bilingualSrtCard');
+const bilingualSrtPreview = document.getElementById('bilingualSrtPreview');
+const bilingualSrtDownload = document.getElementById('bilingualSrtDownload');
+const bilingualSrtInfo = document.getElementById('bilingualSrtInfo');
 
 // Stats elements
 const durationStat = document.getElementById('durationStat');
@@ -100,6 +113,7 @@ async function handleSynthesize(event) {
   
   const text = textInput.value.trim();
   const voiceName = voiceSelect.value;
+  const translateToChinese = translateCheckbox.checked;
   
   if (!text) {
     showError('Please enter some text to synthesize.');
@@ -121,6 +135,7 @@ async function handleSynthesize(event) {
         text,
         voiceName,
         outputFormat: 'wav',
+        translateToChinese,
       }),
     });
 
@@ -164,6 +179,42 @@ async function showResults(data) {
     srtPreview.textContent = 'Unable to load SRT preview';
   }
 
+  // Chinese SRT (if available)
+  if (data.chineseSrtUrl) {
+    chineseSrtCard.hidden = false;
+    chineseSrtDownload.href = data.chineseSrtUrl;
+    chineseSrtDownload.download = data.chineseSrtFilename;
+    chineseSrtInfo.textContent = `${data.chineseSrtFilename} (${formatFileSize(data.chineseSrtSize)})`;
+    
+    try {
+      const chineseSrtResponse = await fetch(data.chineseSrtUrl);
+      const chineseSrtContent = await chineseSrtResponse.text();
+      chineseSrtPreview.textContent = chineseSrtContent;
+    } catch (error) {
+      chineseSrtPreview.textContent = 'Unable to load Chinese SRT preview';
+    }
+  } else {
+    chineseSrtCard.hidden = true;
+  }
+
+  // Bilingual SRT (if available)
+  if (data.bilingualSrtUrl) {
+    bilingualSrtCard.hidden = false;
+    bilingualSrtDownload.href = data.bilingualSrtUrl;
+    bilingualSrtDownload.download = data.bilingualSrtFilename;
+    bilingualSrtInfo.textContent = `${data.bilingualSrtFilename} (${formatFileSize(data.bilingualSrtSize)})`;
+    
+    try {
+      const bilingualSrtResponse = await fetch(data.bilingualSrtUrl);
+      const bilingualSrtContent = await bilingualSrtResponse.text();
+      bilingualSrtPreview.textContent = bilingualSrtContent;
+    } catch (error) {
+      bilingualSrtPreview.textContent = 'Unable to load bilingual SRT preview';
+    }
+  } else {
+    bilingualSrtCard.hidden = true;
+  }
+
   // Stats
   durationStat.textContent = formatDuration(data.duration);
   sentencesStat.textContent = data.sentenceCount;
@@ -175,6 +226,8 @@ async function showResults(data) {
 // Hide results section
 function hideResults() {
   resultSection.hidden = true;
+  chineseSrtCard.hidden = true;
+  bilingualSrtCard.hidden = true;
 }
 
 // Show error message

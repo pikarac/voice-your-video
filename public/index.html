@@ -35,6 +35,13 @@
           </div>
         </div>
 
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="translateCheckbox">
+            <span>Translate to Chinese (生成中文字幕)</span>
+          </label>
+        </div>
+
         <button type="submit" id="synthesizeBtn" class="btn-primary">
           <span class="btn-text">Generate Audio</span>
           <span class="btn-loading" hidden>
@@ -66,6 +73,28 @@
           <div class="srt-preview" id="srtPreview"></div>
           <a id="srtDownload" class="btn-download" download>
             Download SRT
+          </a>
+        </div>
+
+        <div id="chineseSrtCard" class="result-card" hidden>
+          <div class="result-info">
+            <h3>🇨🇳 Chinese Subtitle (中文字幕)</h3>
+            <p id="chineseSrtInfo">-</p>
+          </div>
+          <div class="srt-preview" id="chineseSrtPreview"></div>
+          <a id="chineseSrtDownload" class="btn-download" download>
+            Download Chinese SRT
+          </a>
+        </div>
+
+        <div id="bilingualSrtCard" class="result-card" hidden>
+          <div class="result-info">
+            <h3>🌐 Bilingual Subtitle (双语字幕)</h3>
+            <p id="bilingualSrtInfo">-</p>
+          </div>
+          <div class="srt-preview" id="bilingualSrtPreview"></div>
+          <a id="bilingualSrtDownload" class="btn-download" download>
+            Download Bilingual SRT
           </a>
         </div>
 
